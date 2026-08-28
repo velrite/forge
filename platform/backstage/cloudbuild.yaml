@@ -6,7 +6,7 @@ steps:
       - |
         export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
         corepack enable
-        yarn install --immutable
+        yarn install
         yarn tsc
         yarn build:backend
 
