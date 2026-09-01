@@ -13,6 +13,8 @@ steps:
         yarn build:backend
 
   - name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
     args: ['build', '-f', 'packages/backend/Dockerfile', '-t', '${_IMAGE}', '.']
 
   - name: 'gcr.io/cloud-builders/docker'
