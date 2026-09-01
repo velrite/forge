@@ -15,16 +15,17 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     env:
       - 'DOCKER_BUILDKIT=1'
-    args: ['build', '-f', 'packages/backend/Dockerfile', '-t', '${_IMAGE}', '.']
+    args: ['build', '-f', 'packages/backend/Dockerfile', '-t', '${_IMAGE_BASE}:${_TAG}', '.']
 
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '${_IMAGE}']
+    args: ['push', '${_IMAGE_BASE}:${_TAG}']
 
 images:
-  - '${_IMAGE}'
+  - '${_IMAGE_BASE}:${_TAG}'
 
 substitutions:
-  _IMAGE: 'us-central1-docker.pkg.dev/forge-platform-11124/forge-images/backstage:latest'
+  _IMAGE_BASE: 'us-central1-docker.pkg.dev/forge-platform-11124/forge-images/backstage'
+  _TAG: 'manual'
 
 timeout: '1200s'
 
