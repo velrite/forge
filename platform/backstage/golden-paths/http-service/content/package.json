@@ -1,0 +1,10 @@
+{
+  "name": "${{values.serviceName}}",
+  "version": "0.1.0",
+  "description": "${{values.description}}",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test"
+  }
+}

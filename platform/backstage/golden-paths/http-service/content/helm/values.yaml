@@ -1,0 +1,11 @@
+replicaCount: 1
+image:
+  repository: us-central1-docker.pkg.dev/forge-platform-11124/forge-images/${{values.serviceName}}
+  tag: latest
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

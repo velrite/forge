@@ -1,0 +1,55 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: forge-http-service
+  title: Forge Golden Path - HTTP Service
+  description: >
+    Standardized HTTP service scaffold: app skeleton, Dockerfile, tests,
+    Helm chart, Kubernetes manifests, CI/CD stub, security checks stub,
+    observability stub, and docs. Publish-to-GitLab step is wired in
+    once Phase 6 connects a real GitLab instance - see ADR-010.
+  tags:
+    - forge
+    - golden-path
+    - http-service
+spec:
+  owner: platform-team
+  type: service
+  parameters:
+    - title: Service details
+      required:
+        - serviceName
+        - description
+      properties:
+        serviceName:
+          title: Service Name
+          type: string
+          description: Unique name for the new service
+        description:
+          title: Description
+          type: string
+          description: What this service does
+  steps:
+    - id: fetch-skeleton
+      name: Fetch Skeleton
+      action: fetch:template
+      input:
+        url: ./content
+        values:
+          serviceName: ${{ parameters.serviceName }}
+          description: ${{ parameters.description }}
+
+    - id: register
+      name: Register in Catalog
+      action: catalog:register
+      input:
+        catalogInfoPath: catalog-info.yaml
+        repoContentsUrl: ${{ steps['fetch-skeleton'].output.path }}
+
+  output:
+    text:
+      - title: Next steps
+        content: |
+          Generated locally under the workspace. Real publish-to-GitLab
+          wiring lands in Phase 6 - this demonstrates the template
+          rendering and catalog registration mechanics ahead of that.

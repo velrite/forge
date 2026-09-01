@@ -200,6 +200,12 @@ catalog:
       rules:
         - allow: [Template]
 
+    # Forge golden-path template
+    - type: file
+      target: ../../golden-paths/http-service/template.yaml
+      rules:
+        - allow: [Template]
+
     # Local example organizational data
     - type: file
       target: ../../examples/org.yaml

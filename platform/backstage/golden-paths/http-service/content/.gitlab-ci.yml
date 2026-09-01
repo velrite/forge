@@ -1,0 +1,23 @@
+# Placeholder pipeline - real GitLab connection wired in Phase 6.
+# Stages match the project's reference CI/CD model, scaled to this
+# service's actual risk/size (see project ADRs for the full rationale).
+stages:
+  - test
+  - security
+  - build
+
+test:
+  stage: test
+  script:
+    - npm install
+    - npm test
+
+security_scan:
+  stage: security
+  script:
+    - echo "SAST/dependency scan placeholder - wired in Phase 6"
+
+build_image:
+  stage: build
+  script:
+    - echo "Image build placeholder - wired in Phase 6"
