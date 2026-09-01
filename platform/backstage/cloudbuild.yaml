@@ -1,6 +1,8 @@
 steps:
   - name: 'node:24-trixie-slim'
     entrypoint: bash
+    env:
+      - 'YARN_ENABLE_IMMUTABLE_INSTALLS=false'
     args:
       - -c
       - |
