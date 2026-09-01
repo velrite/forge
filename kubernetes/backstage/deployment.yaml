@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: backstage
-          image: us-central1-docker.pkg.dev/forge-platform-11124/forge-images/backstage:latest
+          image: us-central1-docker.pkg.dev/forge-platform-11124/forge-images/backstage:20260901-015837
           ports:
             - containerPort: 7007
           resources:
