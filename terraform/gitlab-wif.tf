@@ -18,7 +18,7 @@ resource "google_iam_workload_identity_pool_provider" "gitlab" {
     "attribute.ref"        = "assertion.ref"
   }
 
-  # SECURITY: only tokens from the velrite namespace are trusted - not
+  # SECURITY: only tokens from the velrite-group namespace are trusted - not
   # any GitLab.com project anywhere. This is the actual security boundary.
   attribute_condition = "assertion.namespace_path == \"velrite-group\""
 
@@ -36,7 +36,7 @@ resource "google_service_account" "gitlab_ci" {
 resource "google_service_account_iam_member" "gitlab_wif_binding" {
   service_account_id = google_service_account.gitlab_ci.name
   role                = "roles/iam.workloadIdentityUser"
-  member              = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.gitlab.name}/attribute.namespace/velrite"
+  member              = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.gitlab.name}/attribute.namespace/velrite-group"
 }
 
 resource "google_artifact_registry_repository_iam_member" "gitlab_ci_pusher" {
