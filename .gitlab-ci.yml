@@ -4,7 +4,6 @@
 stages:
   - test
   - security
-  - build
   - push
 
 variables:
@@ -39,38 +38,22 @@ dependency_scan:
         - platform/backstage/**/*
   allow_failure: true
 
-authenticate_to_gcp:
-  stage: build
+build_and_push:
+  stage: push
   image: google/cloud-sdk:slim
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/${GCP_WIF_PROVIDER}
   script:
+    # Single job now generates the token AND uses it immediately -
+    # no cross-job handoff, so no stale /tmp path problem.
     - echo "${GCP_ID_TOKEN}" > /tmp/gitlab_token
     - gcloud iam workload-identity-pools create-cred-config
         "${GCP_WIF_PROVIDER}"
         --service-account="${GCP_SERVICE_ACCOUNT}"
-        --output-file="${CI_PROJECT_DIR}/gcp-creds.json"
+        --output-file=/tmp/gcp-creds.json
         --credential-source-file=/tmp/gitlab_token
-    - echo "=== Credential file created in workspace, will be passed as artifact ==="
-    - ls -la "${CI_PROJECT_DIR}/gcp-creds.json"
-  artifacts:
-    paths:
-      - gcp-creds.json
-    expire_in: 10 minutes
-  rules:
-    - changes:
-        - platform/backstage/**/*
-
-build_and_push:
-  stage: push
-  image: google/cloud-sdk:slim
-  needs:
-    - job: authenticate_to_gcp
-      artifacts: true
-  script:
-    - export GOOGLE_APPLICATION_CREDENTIALS="${CI_PROJECT_DIR}/gcp-creds.json"
-    - ls -la "${GOOGLE_APPLICATION_CREDENTIALS}"
+    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json
     - gcloud auth login --cred-file="${GOOGLE_APPLICATION_CREDENTIALS}"
     - gcloud config set project forge-platform-11124
     - cd platform/backstage
