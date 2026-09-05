@@ -12,12 +12,6 @@ variables:
   GCP_WIF_PROVIDER: projects/623383904945/locations/global/workloadIdentityPools/gitlab-pool/providers/gitlab-provider
   GCP_SERVICE_ACCOUNT: gitlab-ci-forge@forge-platform-11124.iam.gserviceaccount.com
 
-# Reference model note (per project ADRs): this is a platform repo, not
-# a golden-path-generated service - stages are scaled to what this repo
-# actually needs (build/push its own image), not the full 10-stage
-# reference model, which is reserved for golden-path services in
-# Phase 5's template once publish-to-GitLab is wired (ADR-010).
-
 lint_and_test:
   stage: test
   image: node:24-trixie-slim
@@ -56,16 +50,13 @@ authenticate_to_gcp:
     - gcloud iam workload-identity-pools create-cred-config
         "${GCP_WIF_PROVIDER}"
         --service-account="${GCP_SERVICE_ACCOUNT}"
-        --output-file=/tmp/gcp-creds.json
+        --output-file="${CI_PROJECT_DIR}/gcp-creds.json"
         --credential-source-file=/tmp/gitlab_token
-    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json
-    - gcloud auth login --cred-file="${GOOGLE_APPLICATION_CREDENTIALS}"
-    - gcloud config set project forge-platform-11124
-    - echo "=== Authenticated to GCP via WIF - no stored secret used ==="
-    - gcloud auth list
+    - echo "=== Credential file created in workspace, will be passed as artifact ==="
+    - ls -la "${CI_PROJECT_DIR}/gcp-creds.json"
   artifacts:
     paths:
-      - /tmp/gcp-creds.json
+      - gcp-creds.json
     expire_in: 10 minutes
   rules:
     - changes:
@@ -74,9 +65,12 @@ authenticate_to_gcp:
 build_and_push:
   stage: push
   image: google/cloud-sdk:slim
-  needs: ["authenticate_to_gcp"]
+  needs:
+    - job: authenticate_to_gcp
+      artifacts: true
   script:
-    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-creds.json
+    - export GOOGLE_APPLICATION_CREDENTIALS="${CI_PROJECT_DIR}/gcp-creds.json"
+    - ls -la "${GOOGLE_APPLICATION_CREDENTIALS}"
     - gcloud auth login --cred-file="${GOOGLE_APPLICATION_CREDENTIALS}"
     - gcloud config set project forge-platform-11124
     - cd platform/backstage
