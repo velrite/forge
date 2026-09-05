@@ -18,6 +18,6 @@ resource "google_project_iam_member" "gitlab_ci_serviceusage" {
 # project-wide storage access.
 resource "google_storage_bucket_iam_member" "gitlab_ci_cloudbuild_bucket" {
   bucket = "forge-platform-11124_cloudbuild"
-  role   = "roles/storage.objectAdmin"
+  role   = "roles/storage.admin"
   member = "serviceAccount:gitlab-ci-forge@forge-platform-11124.iam.gserviceaccount.com"
 }
