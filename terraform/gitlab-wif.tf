@@ -20,7 +20,7 @@ resource "google_iam_workload_identity_pool_provider" "gitlab" {
 
   # SECURITY: only tokens from the velrite namespace are trusted - not
   # any GitLab.com project anywhere. This is the actual security boundary.
-  attribute_condition = "assertion.namespace_path == \"velrite\""
+  attribute_condition = "assertion.namespace_path == \"velrite-group\""
 
   oidc {
     issuer_uri = "https://gitlab.com"
