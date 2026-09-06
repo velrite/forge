@@ -69,7 +69,7 @@ build_and_push:
     - tar --exclude='.git' -czf /tmp/source.tar.gz .
     - gcloud storage cp /tmp/source.tar.gz "gs://${GCS_SOURCE_BUCKET}/source/${TAG}.tar.gz"
     - echo "=== Submitting build against the already-uploaded object ==="
-    - gcloud builds submit --config=cloudbuild.yaml --substitutions=_TAG="${TAG}" "gs://${GCS_SOURCE_BUCKET}/source/${TAG}.tar.gz"
+    - gcloud builds submit --config=cloudbuild.yaml --substitutions=_TAG="${TAG}" --gcs-log-dir="gs://${GCS_SOURCE_BUCKET}/logs" "gs://${GCS_SOURCE_BUCKET}/source/${TAG}.tar.gz"
     - echo "Built and pushed ${IMAGE_BASE}:${TAG}"
   rules:
     - changes:

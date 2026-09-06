@@ -16,3 +16,4 @@ yarn start
 <!-- retry bucket admin fix -->
 <!-- retry with dedicated source bucket -->
 <!-- bypass local-source auto-upload entirely -->
+<!-- redirect build logs to our own bucket too -->
