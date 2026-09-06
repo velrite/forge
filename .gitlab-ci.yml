@@ -1,9 +1,13 @@
 # Forge platform pipeline - builds/pushes the Backstage image via
 # Workload Identity Federation (ADR-012). No stored GCP credentials.
-# Uses a dedicated uniform-IAM bucket for Cloud Build source staging -
-# the auto-managed {PROJECT}_cloudbuild bucket uses legacy ACLs and
-# does not reliably honor IAM grants for WIF/external-account
-# identities (confirmed via repeated real failures, not theory).
+#
+# IMPORTANT: gcloud builds submit's automatic local-directory packaging
+# has a confirmed, reproducible permission-check failure under WIF
+# external-account credentials, independent of target bucket IAM
+# (verified against two separate buckets, one fully self-managed).
+# Workaround: package and upload the source ourselves with plain
+# storage operations, then point builds submit at the GCS object
+# directly instead of a local directory.
 
 stages:
   - test
@@ -61,7 +65,11 @@ build_and_push:
     - gcloud config set project forge-platform-11124
     - cd platform/backstage
     - TAG="${CI_COMMIT_SHORT_SHA}"
-    - gcloud builds submit --config=cloudbuild.yaml --substitutions=_TAG="${TAG}" --gcs-source-staging-dir="gs://${GCS_SOURCE_BUCKET}/source" .
+    - echo "=== Packaging source ourselves (bypasses builds submit's problematic auto-upload) ==="
+    - tar --exclude='.git' -czf /tmp/source.tar.gz .
+    - gcloud storage cp /tmp/source.tar.gz "gs://${GCS_SOURCE_BUCKET}/source/${TAG}.tar.gz"
+    - echo "=== Submitting build against the already-uploaded object ==="
+    - gcloud builds submit --config=cloudbuild.yaml --substitutions=_TAG="${TAG}" "gs://${GCS_SOURCE_BUCKET}/source/${TAG}.tar.gz"
     - echo "Built and pushed ${IMAGE_BASE}:${TAG}"
   rules:
     - changes:

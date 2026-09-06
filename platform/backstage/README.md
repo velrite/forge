@@ -15,3 +15,4 @@ yarn start
 <!-- retry -->
 <!-- retry bucket admin fix -->
 <!-- retry with dedicated source bucket -->
+<!-- bypass local-source auto-upload entirely -->
