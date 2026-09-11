@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backstage
+  namespace: forge-platform
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: backstage
+  namespaceSelector:
+    matchNames:
+      - forge-platform
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
