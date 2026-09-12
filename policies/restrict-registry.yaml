@@ -1,0 +1,20 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: approved-registries-only
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["forge-platform"]
+      validate:
+        message: "Images in forge-platform must come from our Artifact Registry or well-known public images used in this build"
+        pattern:
+          spec:
+            containers:
+              - image: "us-central1-docker.pkg.dev/forge-platform-11124/* | quay.io/argoproj/* | docker.io/otel/* | *prometheus-community* | *grafana* | node:*"

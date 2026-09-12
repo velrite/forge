@@ -1,0 +1,20 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-app-label
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: require-app-label-on-pods
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["forge-platform", "forge-demo"]
+      validate:
+        message: "Pods must have an 'app' label for observability/ownership tracing"
+        pattern:
+          metadata:
+            labels:
+              app: "?*"
