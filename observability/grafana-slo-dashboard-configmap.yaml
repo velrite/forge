@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: forge-slo-dashboard
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  forge-slo.json: |
+    {
+      "title": "Forge - Backstage SLO",
+      "panels": [
+        {
+          "title": "Availability Ratio (live)",
+          "type": "stat",
+          "targets": [{"expr": "kube_deployment_status_replicas_available{deployment=\"backstage\",namespace=\"forge-platform\"} / kube_deployment_spec_replicas{deployment=\"backstage\",namespace=\"forge-platform\"}"}]
+        },
+        {
+          "title": "Error Budget Remaining (%)",
+          "type": "gauge",
+          "targets": [{"expr": "(avg_over_time((kube_deployment_status_replicas_available{deployment=\"backstage\",namespace=\"forge-platform\"} / kube_deployment_spec_replicas{deployment=\"backstage\",namespace=\"forge-platform\"})[30d:5m]) - 0.99) / (1 - 0.99) * 100"}]
+        },
+        {
+          "title": "Pod Restarts (1h)",
+          "type": "timeseries",
+          "targets": [{"expr": "increase(kube_pod_container_status_restarts_total{namespace=\"forge-platform\",pod=~\"backstage.*\"}[1h])"}]
+        }
+      ]
+    }
