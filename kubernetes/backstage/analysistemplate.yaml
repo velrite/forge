@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: backstage-readiness-check
+  namespace: forge-platform
+spec:
+  args:
+    - name: canary-hash
+  metrics:
+    - name: pod-ready-ratio
+      interval: 15s
+      count: 4
+      successCondition: result >= 1
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
+          query: |
+            sum(kube_pod_status_ready{namespace="forge-platform",condition="true"} * on(pod) group_left() kube_pod_labels{label_rollouts_pod_template_hash="{{args.canary-hash}}"})
+            /
+            sum(kube_pod_labels{namespace="forge-platform",label_rollouts_pod_template_hash="{{args.canary-hash}}"})
