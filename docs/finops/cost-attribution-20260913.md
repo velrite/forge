@@ -132,3 +132,50 @@ or to unset it, run:
 
   $ gcloud config unset project
 ```
+
+## Cluster-level cost driver config (backfilled)
+```
+autoscaling:
+  autoprovisioningNodePoolDefaults:
+    imageType: COS_CONTAINERD
+    management:
+      autoRepair: true
+      autoUpgrade: true
+    oauthScopes:
+    - https://www.googleapis.com/auth/devstorage.read_only
+    - https://www.googleapis.com/auth/logging.write
+    - https://www.googleapis.com/auth/monitoring
+    - https://www.googleapis.com/auth/service.management.readonly
+    - https://www.googleapis.com/auth/servicecontrol
+    - https://www.googleapis.com/auth/trace.append
+    serviceAccount: default
+    upgradeSettings:
+      maxSurge: 1
+      strategy: SURGE
+  autoscalingProfile: OPTIMIZE_UTILIZATION
+  enableNodeAutoprovisioning: true
+  resourceLimits:
+  - maximum: '1000000000'
+    resourceType: cpu
+  - maximum: '1000000000'
+    resourceType: memory
+  - maximum: '1000000000'
+    resourceType: nvidia-tesla-t4
+  - maximum: '1000000000'
+    resourceType: nvidia-tesla-a100
+currentNodeCount: 2
+```
+
+## Google published list prices (Cloud Billing Catalog API, us-central1)
+**This is Google's real, current public price list — not your actual invoice, which may differ with discounts/commitments. No BigQuery billing export exists for this project, so this is the closest real (non-fabricated) pricing signal available.**
+```
+DESCRIPTION                                                           UNIT      LIST PRICE (USD)
+Spot Preemptible N2D AMD Custom Instance Core running in Americas     h         0.011630       
+Commitment v1: N2D AMD Ram in Americas for 1 Year                     GiBy.h    0.002322       
+Spot Preemptible N2D AMD Instance Core running in Americas            h         0.011080       
+Sole Tenancy Premium for N2D AMD Sole Tenancy Instance RAM running i  GiBy.h    0.000369       
+Sole Tenancy Premium for N2D AMD Sole Tenancy Instance Core running   h         0.002750       
+```
+
+## Note on applying list price to requests
+Per-namespace CPU/memory requests were captured earlier this session (see prior section). Multiplying those real request values by the list prices above gives a rough monthly estimate — but only do this calculation once you confirm which specific SKU row actually matches this Autopilot cluster's billing mode, since Autopilot bills per-pod-resource, not per-node, and the exact matching SKU description should be confirmed against the GCP Console pricing page before treating any resulting number as reliable.
