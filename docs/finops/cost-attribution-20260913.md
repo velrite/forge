@@ -1,3 +1,5 @@
+> **SUPERSEDED — contains incorrect SKU pricing data (wrong Compute Engine SKUs matched, not applicable to Autopilot). See the OpenCost-based report (commit 4300aa2) for accurate figures. Kept for the record, not for reference.**
+
 # Phase 12 — Cost Attribution Report (2026-09-13T01:03:46Z)
 
 
