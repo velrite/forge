@@ -20,3 +20,8 @@ created, initial threat model documented. No GKE cluster yet.
 - policies/     — OPA/Gatekeeper or Kyverno policies
 - tests/        — pipeline and infra tests
 - docs/         — architecture, ADRs, security, reliability, operations, runbooks, troubleshooting
+
+## Documentation
+
+Full engineering documentation, evidence, and operational runbooks:
+[docs/index.md](docs/index.md)
