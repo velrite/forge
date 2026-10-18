@@ -269,3 +269,65 @@ See the [evidence index](docs/evidence/README.md) for the artifact inventory and
 ---
 
 **Project focus:** Platform Engineering · DevSecOps · Kubernetes · GitOps · Progressive Delivery · Infrastructure as Code · Observability · FinOps
+
+
+## Evidence gallery
+
+<details>
+<summary><strong>View captured platform evidence</strong></summary>
+
+The screenshots below provide visual evidence for selected infrastructure, delivery, security, observability, reliability, and cost checks. The [evidence index](docs/evidence/README.md) maps each artifact to the claim it supports.
+
+### Infrastructure and delivery
+
+![GKE cluster nodes](docs/evidence/01-cluster-nodes.png)
+
+![Backstage rollout healthy](docs/evidence/02-backstage-rollout-healthy.png)
+
+![Backstage pods and service](docs/evidence/03-backstage-pods-service.png)
+
+![GitLab pipeline success](docs/evidence/04-gitlab-pipeline-success.png)
+
+![Cloud Build history](docs/evidence/05-cloudbill-history.png)
+
+![Artifact Registry images](docs/evidence/06-artifacts-registry-images.png)
+
+### Identity and infrastructure validation
+
+![Workload Identity Federation pool and provider](docs/evidence/07-wif-pool-provide.png)
+
+![IAM least-privilege configuration](docs/evidence/08-iam-least-privilege.png)
+
+![Terraform clean plan](docs/evidence/09-terraform-clean-plan.png)
+
+### GitOps and progressive delivery
+
+![Argo CD application health](docs/evidence/10-argocd-app-health.png)
+
+![GitOps self-heal sequence](docs/evidence/11-gitops-self-heal-sequence.png)
+
+![Canary rollout progression](docs/evidence/12-canary-progression.png)
+
+![Canary automatic rollback](docs/evidence/13-canary-auto-rollback.png)
+
+### Policy enforcement and observability
+
+![Kyverno policy list](docs/evidence/14-kyverno-policy-list.png)
+
+![Kyverno admission denied](docs/evidence/15-kyverno-admission-denied.png)
+
+![Prometheus targets up](docs/evidence/16-prometheus-targets-up.png)
+
+![SLO PromQL live result](docs/evidence/17-slo-promql-live-result.png)
+
+![Grafana SLO dashboard](docs/evidence/18-grafana-slo-dashboard.png)
+
+### Cost and recovery
+
+![OpenCost cost breakdown](docs/evidence/19-opencost-cost-breakdown.png)
+
+![Pod failure self-healing](docs/evidence/20-pod-failure-selfheal.png)
+
+![Google Cloud budget alert](docs/evidence/22-gcp-budget-alert.png)
+
+</details>
