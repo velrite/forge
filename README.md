@@ -42,43 +42,7 @@ Forge explores those responsibilities as one integrated system. Its emphasis is 
 
 ## Architecture
 
-```text
-Developer
-   |
-   | git push
-   v
-GitHub (canonical source) ---- mirror ----> GitLab CI
-                                              |
-                                              | OIDC / Workload Identity Federation
-                                              | no stored GCP service-account key
-                                              v
-                                         Google Cloud Build
-                                              |
-                                              v
-                                         Artifact Registry
-                                         (immutable image tags)
-                                              |
-                                              v
-GitHub (desired state) <--- watched by --- Argo CD
-                                              |
-                                              | reconcile
-                                              v
-                                         Argo Rollouts
-                                              |
-                                              | staged canary:
-                                              | 20% -> analysis
-                                              | 50% -> analysis
-                                              | 100%
-                                              v
-                                         GKE Autopilot
-                                              |
-                                              | admission evaluation
-                                              v
-                                            Kyverno
-
-Prometheus supplies rollout-analysis signals and Kubernetes-level
-observability; OpenCost provides namespace-level cost attribution.
-```
+![Forge Developer Platform Architecture](docs/evidence/Forge_%20Developer%20Platform%20Architecture.png)
 
 ### Delivery flow
 
