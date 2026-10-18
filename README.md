@@ -1,348 +1,271 @@
-# Forge: Internal Developer Platform on GCP
+# Forge — Internal Developer Platform on Google Cloud
 
-Forge is a self-service developer platform on Google Kubernetes Engine. I built it to answer one question with evidence instead of claims: can a platform actually catch its own bad deployments and enforce its own rules, or does it just say it does.
+**A platform-engineering project focused on secure delivery, declarative operations, progressive releases, policy enforcement, and operational evidence.**
 
-**Status:** Core infrastructure, CI/CD, GitOps, progressive delivery, policy enforcement, observability, and FinOps attribution are built and behaviorally verified — see the tables below for exactly what "verified" means for each one. Developer self-service is not complete: the golden-path template can scaffold a service but cannot publish it to a real repository yet ([ADR-010](docs/decisions/ADR-010-golden-path-publish-deferred.md)). Grafana dashboard rendering and Slack alert delivery are configured but unconfirmed. Node-failure resilience was deliberately not tested. Nothing here has served real user traffic.
+Forge brings together the core building blocks of an Internal Developer Platform (IDP): infrastructure as code, identity-aware CI/CD, GitOps reconciliation, canary delivery, admission control, Kubernetes observability, and workload cost attribution. The project is designed around a practical engineering question:
 
-This is not an AI/ML project. There is no model serving or inference workload anywhere in it.
+> Can the platform demonstrate that its controls work—not just show that the configuration exists?
+
+The repository includes implementation artifacts, operational procedures, architecture decisions, troubleshooting records, and evidence captured from the running environment.
+
+[Architecture](#architecture) · [Verified capabilities](#verified-capabilities) · [Technology stack](#technology-stack) · [Getting started](#getting-started) · [Documentation](#documentation)
 
 ---
 
-## Engineering Problem
+## Platform at a glance
 
-A developer wants to ship a change. Getting it into production safely means testing it, scanning it, building it, storing it somewhere immutable, rolling it out gradually, checking its health while doing so, and automatically pulling it back if something's wrong — without a human babysitting each step, and without the credentials that do all this sitting around as a standing attack surface.
+| Capability | Implementation |
+|---|---|
+| Cloud infrastructure | Terraform, Google Kubernetes Engine (GKE) Autopilot, VPC, Artifact Registry |
+| CI/CD identity | GitLab CI with Google Cloud Workload Identity Federation |
+| Image build and storage | Cloud Build and Artifact Registry with immutable image tags |
+| Deployment reconciliation | Argo CD |
+| Progressive delivery | Argo Rollouts with staged canary analysis |
+| Admission controls | Kyverno policies |
+| Metrics and reliability signals | Prometheus, kube-state-metrics, OpenTelemetry Collector |
+| Cost visibility | OpenCost and Google Cloud budget alerts |
+| Developer portal | Backstage and golden-path scaffolding |
+| Engineering governance | Architecture Decision Records, operational runbooks, evidence index |
+
+## Why this project matters
+
+A delivery platform is more than a pipeline that turns source code into a container image. A dependable platform must also manage identity, preserve a declarative source of truth, release changes progressively, detect unhealthy deployments, apply guardrails before workloads enter the cluster, and make operational behavior observable.
+
+Forge explores those responsibilities as one integrated system. Its emphasis is on **verifiable platform behavior**:
+
+- **Identity without long-lived CI credentials.** GitLab uses Workload Identity Federation to obtain Google Cloud access without storing a service-account key in the pipeline.
+- **Reconciliation, not configuration alone.** Argo CD continuously compares cluster state with Git and can correct tested forms of drift.
+- **Health-gated releases.** Argo Rollouts advances through staged canary weights and uses Prometheus-backed analysis to inform rollout decisions.
+- **Preventive policy enforcement.** Kyverno evaluates workload admission rules; the `latest` image-tag policy is enforced at creation time.
+- **Operational visibility.** Prometheus scrape health, Kubernetes-level reliability queries, and OpenCost namespace attribution provide concrete signals for investigation.
+- **Engineering traceability.** Architecture decisions, debugging notes, operating instructions, and screenshots make implementation choices and verification steps reviewable.
 
 ## Architecture
 
-```
+```text
 Developer
-  |  git push
-  v
-GitHub (canonical)  --mirror-->  GitLab (CI execution)
-                                   |  OIDC token (WIF, no static key)
-                                   v
-                                 Cloud Build
-                                   |  unique tag, immutable
-                                   v
-                                 Artifact Registry
-                                   |
-                                   v
-Argo CD  <--- watches --- GitHub (desired state)
-  |  reconciles
-  v
-Argo Rollouts  --- queries ---> Prometheus (readiness signal)
-  |  20% -> analysis -> 50% -> analysis -> 100%
-  v
-GKE Autopilot (forge-cluster)
-  |  every object creation checked
-  v
-Kyverno (admission)
+   |
+   | git push
+   v
+GitHub (canonical source) ---- mirror ----> GitLab CI
+                                              |
+                                              | OIDC / Workload Identity Federation
+                                              | no stored GCP service-account key
+                                              v
+                                         Google Cloud Build
+                                              |
+                                              v
+                                         Artifact Registry
+                                         (immutable image tags)
+                                              |
+                                              v
+GitHub (desired state) <--- watched by --- Argo CD
+                                              |
+                                              | reconcile
+                                              v
+                                         Argo Rollouts
+                                              |
+                                              | staged canary:
+                                              | 20% -> analysis
+                                              | 50% -> analysis
+                                              | 100%
+                                              v
+                                         GKE Autopilot
+                                              |
+                                              | admission evaluation
+                                              v
+                                            Kyverno
+
+Prometheus supplies rollout-analysis signals and Kubernetes-level
+observability; OpenCost provides namespace-level cost attribution.
 ```
 
-| Layer | What is used |
+### Delivery flow
+
+1. A code change is pushed to the canonical GitHub repository and mirrored to GitLab for CI execution.
+2. GitLab authenticates to Google Cloud using Workload Identity Federation rather than a long-lived service-account key.
+3. Cloud Build builds the image and publishes it to Artifact Registry using an immutable tag.
+4. Argo CD reconciles Kubernetes resources from the declared Git state.
+5. Argo Rollouts progressively advances the application through canary stages, using Prometheus analysis as a health signal.
+6. Kyverno evaluates applicable admission policies when Kubernetes resources are created.
+
+## Verified capabilities
+
+The project distinguishes a configured integration from a behavior that has been exercised and observed. The following results are documented in the repository's evidence and operational records.
+
+| Capability | Verification result |
 |---|---|
-| Infrastructure | Terraform (GCS state, versioned), GKE Autopilot (regional, private nodes), Artifact Registry (immutable tags) |
-| Delivery | GitLab CI/CD, Workload Identity Federation, Cloud Build, Argo CD |
-| Progressive delivery | Argo Rollouts, canary 20/50/100, Prometheus-backed analysis |
-| Observability | kube-prometheus-stack, OpenTelemetry Collector, OpenCost |
-| Security | Kyverno admission policies, least-privilege IAM, no static GCP keys |
+| GKE infrastructure | Running regional cluster with private nodes confirmed through Google Cloud inspection |
+| Infrastructure as code | Terraform plan reported no changes against the provisioned environment at the time of verification |
+| CI identity | Workload Identity Federation configuration inspected; no static GCP service-account key used by CI |
+| IAM scope | CI identity's project role assignments inspected; no Owner or Editor role in the recorded verification |
+| GitOps drift correction | A test workload was manually scaled down and Argo CD restored its declared replica count |
+| Canary progression | Rollout weight progression observed at 20%, 50%, and 100% |
+| Automated rollout abort | An intentionally invalid image tag caused the canary to abort while stable pods remained running during the observed test |
+| Admission policy | A pod using `nginx:latest` was rejected by Kyverno before creation |
+| Metrics collection | Prometheus target health was inspected and active scrape targets were observed |
+| Pod self-healing | Deleting a managed pod resulted in its controller creating a replacement |
+| Cost attribution | OpenCost returned computed namespace-level cost data for a sampled observation window |
+| Budget guardrail | Google Cloud budget alerts configured at 50%, 90%, 100%, and 150% of the configured $10 budget |
 
----
+These checks demonstrate specific behaviors in the tested environment; they are not a claim of production workload history or a substitute for repeatable automated integration tests. The supporting evidence index maps captured artifacts to the corresponding claims.
 
-## The Failure That Took Longest to Actually Fix
+## Technology stack
 
-I found this one by reading raw HTTP responses, not by trusting the error GCP gave me.
-
-**Symptom.** `gcloud builds submit`, run as the CI service account under Workload Identity Federation, failed with `The user is forbidden from accessing the bucket`. Granting `roles/storage.objectAdmin`, then `roles/storage.objectViewer`, on the target bucket both failed identically.
-
-**What looked fine.** The IAM grants looked progressively more permissive and more correct each time. They weren't touching the actual problem.
-
-**Root cause.** A raw `--log-http` diagnostic on the failing request showed the real error underneath the wrapper text: `does not have storage.buckets.list access`. That permission does not exist at bucket scope — it is project-level only, so no bucket-scoped grant, however broad, could ever satisfy it. Separately, Cloud Build's auto-managed `{project}_cloudbuild` bucket uses legacy ACLs that don't reliably honor IAM for WIF/external-account identities at all, and `gcloud builds submit`'s automatic local-directory upload has its own, independent permission check under WIF that fails even with correct IAM.
-
-**What I did.** Granted `roles/storage.admin` at the project level — the minimal predefined role that actually carries `storage.buckets.list`. Created a dedicated, uniform-IAM bucket instead of relying on the auto-managed one. Bypassed the automatic upload path entirely: package the source with `tar`, upload with `gcloud storage cp`, then point `builds submit` at the already-uploaded object. Confirmed the fix locally with `--impersonate-service-account` before trusting a full pipeline run — this became the standard approach for every IAM fix after this one.
-
-Full writeup: [docs/engineering/debugging-history.md](docs/engineering/debugging-history.md)
-
----
-
-## What Is Proven
-
-| Capability | Evidence | What it actually shows |
+| Layer | Technology | Role in Forge |
 |---|---|---|
-| GKE Autopilot cluster real, private, regional | [01](docs/evidence/01-cluster-nodes.png) | `gcloud` describe returns `True True RUNNING` |
-| Backstage runs as a canary-capable Rollout, not a plain Deployment | [02](docs/evidence/02-backstage-rollout-healthy.png) | `kubectl argo rollouts get rollout` shows `Status: Healthy`, `Step: 6/6` |
-| CI authenticates with zero stored GCP credentials | [07](docs/evidence/07-wif-pool-provide.png) | `attributeCondition` scoped to `velrite-group`, no key/secret field in the output |
-| CI identity is least-privilege | [08](docs/evidence/08-iam-least-privilege.png) | `gcloud projects get-iam-policy` shows 5 scoped roles, no Owner/Editor |
-| Infrastructure has zero drift | [09](docs/evidence/09-terraform-clean-plan.png) | `terraform plan` returns "No changes" against the real running cluster |
-| GitOps drift correction is real, not configured | [11](docs/evidence/11-gitops-self-heal-sequence.png) | `gitops-demo` manually scaled to 0; Argo CD reverted it to 2, confirmed `Synced`/`Healthy` within a 60 s check |
-| Canary rollout actually stages traffic | [12](docs/evidence/12-canary-progression.png) | `SetWeight` observed at 20 and 50 before reaching 100 |
-| Bad deploy is caught and blocked automatically | [13](docs/evidence/13-canary-auto-rollback.png) | Deliberately invalid tag deployed; status reached `Degraded`/aborted within a 90 s window; stable pods stayed `Running` throughout |
-| Admission policy actually blocks, not just logs | [15](docs/evidence/15-kyverno-admission-denied.png) | `kubectl apply` of an `nginx:latest` pod was denied by the admission webhook, pod never created |
-| Metrics are real, not a dashboard pointed at nothing | [16](docs/evidence/16-prometheus-targets-up.png) | Prometheus active-target list shows real scrape health |
-| Cost attribution is computed, not invented | [19](docs/evidence/19-opencost-cost-breakdown.png) | Real per-namespace OpenCost figures, one pull, ~87.8 h window (see FinOps) |
-| Pod failure self-heals | [20](docs/evidence/20-pod-failure-selfheal.png) | Pod deleted directly; replacement scheduled within ~20 s |
+| Infrastructure | Terraform, GCS remote state, GKE Autopilot, VPC | Declarative provisioning and managed Kubernetes infrastructure |
+| CI/CD | GitLab CI/CD, Workload Identity Federation, Cloud Build | Pipeline orchestration and short-lived cloud identity |
+| Container registry | Artifact Registry | Storage of built images with immutable tags |
+| GitOps | Argo CD | Desired-state reconciliation and drift correction |
+| Progressive delivery | Argo Rollouts | Staged canary releases and analysis-driven rollout decisions |
+| Policy | Kyverno | Kubernetes admission-time guardrails |
+| Metrics | Prometheus, kube-state-metrics | Scraping and Kubernetes-level reliability signals |
+| Telemetry | OpenTelemetry Collector | Telemetry collection and export configuration |
+| FinOps | OpenCost, Google Cloud budgets | Namespace-level cost attribution and spend alerts |
+| Developer experience | Backstage | Developer portal and golden-path service scaffolding |
 
----
+## Security and operational design
 
-## Failure Catalogue
+### Identity and access
 
-Includes my own invalid attempts, not just the clean fixes.
+- Workload Identity Federation is used for CI-to-Google-Cloud authentication, avoiding a stored service-account key in the pipeline.
+- The CI identity's role assignments were inspected as part of verification.
+- Artifact Registry uses immutable image tags to reduce the risk of silently replacing an image behind an existing tag.
 
-**AnalysisTemplate, two distinct root causes before it worked.** First query targeted `kube_pod_labels{label_rollouts_pod_template_hash="..."}`, which returned no data for this workload — switched to a deployment-level readiness ratio, which returned real data but then failed with a type error (`invalid operation: >= (mismatched types []float64 and int)`), because Argo Rollouts' Prometheus provider always returns an array, even for one value. Fixed by indexing it explicitly (`result[0] >= 1`).
+### Admission policy
 
-**My own typo stalled a rollback test for 17+ minutes.** I ran `kubectl argo rollouts undo rollout backstage` — an extra word that made the CLI look for a rollout literally named `"rollout"`. It errored and did nothing, and a failed canary pod sat in `ImagePullBackOff` the whole time I thought it was recovering. Fixed by redeploying the known-good tag directly.
+Kyverno provides admission-time policy evaluation. The `disallow-latest-tag` policy is configured in enforcement mode. The `require-app-label` and `restrict-image-registries` policies are configured in audit mode, allowing policy findings to be evaluated before enforcement is tightened.
 
-**I deleted a pod I incorrectly called orphaned.** It had a real controller, `ReplicaSet backstage-6b74bb5dd9` with `DESIRED: 1`. Deleting it just triggered instant recreation. Caught by checking the actual output instead of trusting a "done" claim; fixed by scaling the real ReplicaSet to 0 directly.
+### Delivery safety
 
-**First FinOps attempt matched the wrong SKUs.** Filtered Google's billing catalog for Autopilot/Compute keywords and matched Spot, Sole-Tenancy, and Commitment pricing — none applicable to an on-demand Autopilot cluster. Caught before anyone relied on the numbers, pivoted to OpenCost for real computed figures. The wrong report is still in the repo, marked superseded, not deleted.
+Argo Rollouts stages traffic through canary weights and uses Prometheus-backed analysis. The repository documents a failure test in which an invalid image tag caused the rollout to abort while the stable version remained available during the observed test window.
 
-**`kubectl apply` failed on two separate CRDs for the same underlying reason.** Both Argo CD's `ApplicationSet` CRD and Argo Rollouts' `Rollout` CRD exceeded `kubectl`'s client-side apply annotation limit (`262144 bytes`) — not a config error, a hard platform ceiling. Fixed with `--server-side --force-conflicts` both times, once I recognized the pattern.
+### Observability boundaries
 
-**Cluster memory pressure caused three separate "new" failures that were the same cause.** OTel Collector, Argo Rollouts controller, and OpenCost each independently hit `Insufficient memory` on first install. `kubectl top nodes` showed low utilization the whole time, because Kubernetes schedules against requested memory, not actual usage.
+Backstage's `/metrics` endpoint was checked and did not return Prometheus-format application metrics. Consequently, the documented SLOs use Kubernetes-level signals rather than application request latency or end-user experience measurements. The OpenTelemetry Collector is configured with a debug exporter; traces are not retained in a dedicated queryable tracing backend.
 
----
+## Engineering investigation: diagnosing Workload Identity Federation and Cloud Build
 
-## Security
+One of the project's most useful engineering outcomes came from investigating a CI build failure that appeared to be a bucket-level permission problem.
 
-Implemented: Workload Identity Federation (no static GCP keys anywhere in CI), least-privilege IAM for the CI identity (verified role list, not Owner/Editor), immutable image tags (a real registry rejection enforces this, not just policy), Kyverno admission control with one Enforce policy (`disallow-latest-tag`) and two Audit policies (`require-app-label`, `restrict-image-registries` — deliberately not blocking yet, to avoid breaking already-running workloads during rollout).
+**Symptom:** `gcloud builds submit` failed with a bucket-access error for the CI identity. Adding bucket-scoped object permissions did not resolve it.
 
-**Gaps, stated plainly:** Artifact Registry vulnerability scanning is enabled but no scan result has ever been pulled and reviewed. No network policies restrict pod-to-pod traffic inside the cluster. No image signing or SBOM generation. Backstage runs guest-only auth with an in-memory SQLite catalog that does not survive a pod restart ([ADR-007](docs/decisions/ADR-007-backstage-database.md)).
+**Diagnosis:** Inspecting the raw HTTP response with `--log-http` revealed a missing `storage.buckets.list` permission. That permission could not be satisfied by a bucket-scoped grant. The investigation also identified complications with Cloud Build's automatically managed upload bucket and the automatic source-upload path when using a federated identity.
 
----
+**Resolution:** The workflow was changed to use a dedicated uniform-IAM bucket, explicitly package and upload the source archive with `tar` and `gcloud storage cp`, and submit the already-uploaded source object to Cloud Build. The required project-level permission was granted to make the bucket-list operation possible.
 
-## Observability and SLOs
+**Process improvement:** The permission change was validated through service-account impersonation before relying on a full pipeline run. The detailed incident record and related investigations are available in [the debugging history](docs/engineering/debugging-history.md).
 
-Backstage's `/metrics` endpoint returns `text/html`, not Prometheus format — confirmed with `curl -i`, not assumed. SLOs here are therefore Kubernetes-level signals via kube-state-metrics, not application request/latency data ([ADR-015](docs/decisions/ADR-015-slo-source-pivot.md)).
+This is an example of the project's engineering approach: inspect the underlying failure, distinguish the visible symptom from the actual permission boundary, validate the fix, and preserve the reasoning for future operators.
 
-| SLO | Target | Why |
+## Reliability objectives and scope
+
+The repository defines Kubernetes-level reliability objectives that match the current architecture.
+
+| Signal | Target | Interpretation |
 |---|---|---|
-| Availability | 99% over 30 days | Single Rollout, 2 replicas, no multi-zone redundancy — a 99.9% target would misrepresent the actual architecture |
-| Restart stability | 0 restarts/hour | A pod that crash-loops quickly can still look "available" in a coarse availability sample |
+| Availability | 99% over 30 days | A deliberately conservative target for the current single-rollout, two-replica design |
+| Restart stability | 0 restarts per hour | Complements availability by detecting unstable workloads |
 
-Traces are received by the OpenTelemetry Collector and routed to a `debug` exporter — they exist transiently in pod logs, not in any queryable trace backend. Stated here, not left implied.
+These are platform-level objectives, not measured application-level SLOs. Forge has not been load-tested and has not served real user traffic. Node-failure resilience has not been tested; the existing cluster's resource headroom made an unplanned disruption an inappropriate test without additional capacity and a controlled test plan.
 
-Full detail: [docs/observability/observability.md](docs/observability/observability.md), [docs/reliability/slo.md](docs/reliability/slo.md)
+## Cost visibility
 
----
+OpenCost has been used to retrieve computed namespace-level cost attribution from the cluster. One recorded sample covered approximately 87.8 hours for most namespaces and reported $57.15 month-to-date at the time of collection. This is a **point-in-time sample**, not a continuous cost trend or a monthly forecast.
 
-## FinOps
+A Google Cloud budget guardrail is configured at $10 with alerts at 50%, 90%, 100%, and 150%. Actual charges depend on the resources provisioned and the time they remain active. Review the cloud billing account and current budget configuration before running the environment.
 
-Real OpenCost pull, one sample window (~87.8 hours tracked for most namespaces), total **$57.15** month-to-date:
+## Developer experience
 
-| Namespace | CPU Cost | RAM Cost | Total |
-|---|---|---|---|
-| kube-system | $15.9614 | $9.3198 | $25.2812 |
-| argocd | $9.6677 | $5.1833 | $14.8510 |
-| observability | $9.5528 | $4.8093 | $14.3621 |
-| forge-platform | $1.0583 | $0.2844 | $1.3427 |
-| forge-demo | $0.5540 | $0.0928 | $0.6468 |
-| kyverno | $0.1857 | $0.0373 | $0.2230 |
-| argo-rollouts | $0.0371 | $0.0062 | $0.0434 |
+Forge includes Backstage and a golden-path template for scaffolding a service. The template demonstrates the starting point for a standardized developer workflow. The repository-publishing step is not yet automated end to end, so the current implementation should be understood as **developer-portal scaffolding**, rather than a complete self-service service-provisioning lifecycle.
 
-A single pull, not a continuous monitor — read it as a snapshot. A GCP budget guardrail is separately configured: $10/month, alerting at 50/90/100/150% of spend ([22](docs/evidence/22-gcp-budget-alert.png)).
+## Getting started
 
-A first attempt at this used the wrong GCP SKUs entirely — see Failure Catalogue.
+Forge provisions cloud infrastructure and can incur charges. Review the [operations guide](docs/operations/getting-started.md) before applying Terraform or deploying resources.
 
----
+### Prerequisites
 
-## Production-Shaped, Not Production-Claimed
+- Google Cloud project with the required APIs and permissions enabled
+- Terraform and Google Cloud CLI (`gcloud`)
+- `kubectl` and access to the target GKE cluster
+- Access to the GitHub and GitLab repositories used by the delivery workflow
+- A configured Google Cloud billing account and budget controls
 
-Forge uses production practices: Workload Identity Federation, GitOps with proven self-heal, progressive delivery with proven automated rollback, admission-time policy enforcement, SLOs, and real cost attribution. It has not served real user traffic and was not load-tested.
+### Provisioning entry point
 
-Out of scope by design: multi-region, node-level failover (deliberately not tested — a 2-node cluster already near its memory ceiling risks a genuine extended outage from a failed test), and any claim of production users.
+The repository's operations guide contains the full start, verify, smoke-test, and destroy procedures, including expected command output. The basic cluster access sequence documented for the project is:
 
----
+```bash
+cd terraform
 
-## Known Limitations
+terraform apply -auto-approve \
+  -target=google_container_cluster.forge \
+  -target=google_compute_router_nat.forge_nat \
+  -target=google_compute_router.forge_router
 
-- Developer self-service is not end-to-end: the golden-path template scaffolds a service but cannot publish it to a real repository.
-- Grafana dashboard rendering was never confirmed after the ConfigMap was applied.
-- Slack alert delivery was configured and a test alert was fired; delivery to the channel was never confirmed.
-- Vulnerability scanning is enabled; no scan result has been reviewed.
-- Backstage's catalog is in-memory SQLite — state does not survive a pod restart.
-- No application-level SLOs for Backstage; all reliability signals are Kubernetes-level.
-- Node-failure resilience has not been tested.
-- An earlier, incorrect FinOps report remains in the repository, marked superseded rather than deleted.
+gcloud container clusters get-credentials forge-cluster \
+  --region=us-central1 \
+  --project=forge-platform-11124
+```
 
----
+The Terraform targets above are a staged provisioning entry point, not a replacement for the complete documented lifecycle. Follow the [getting-started guide](docs/operations/getting-started.md) for the intended order of operations, verification, and teardown. Confirm that the project ID and active Google Cloud account are correct before running commands.
 
-## Running It
+## Repository layout
 
-Bringing the cluster up, verifying it, and tearing it down are documented with exact commands and expected output in [docs/operations/getting-started.md](docs/operations/getting-started.md). The cluster and its Cloud NAT are the only components that cost money while running; everything else costs nothing whether the cluster is up or down.
+```text
+forge/
+├── terraform/              # Cloud infrastructure as code
+├── kubernetes/              # Rollout, Service, monitoring and analysis manifests
+├── platform/backstage/      # Backstage portal, templates and build configuration
+├── gitops/                  # Argo CD-managed application state
+├── policies/                # Kyverno admission policies
+├── observability/           # SLO queries and dashboard configuration
+└── docs/
+    ├── architecture/        # System overview and architecture documentation
+    ├── decisions/           # Architecture Decision Records (ADR-001–ADR-017)
+    ├── operations/          # Start, verify, test and destroy procedures
+    ├── security/            # Security control documentation
+    ├── reliability/         # SLOs and reliability assumptions
+    ├── engineering/         # Debugging history and technical debt
+    └── evidence/            # Screenshot evidence and index
+```
 
 ## Documentation
 
-- [Documentation index](docs/index.md)
-- [Architecture](docs/architecture/system-overview.md)
-- [Getting started — start, verify, test, destroy](docs/operations/getting-started.md)
-- [Security controls](docs/security/security-controls.md)
-- [Observability](docs/observability/observability.md)
-- [Reliability / SLOs](docs/reliability/slo.md)
-- [Debugging history](docs/engineering/debugging-history.md)
-- [Lessons learned](docs/engineering/lessons-learned.md)
-- [Technical debt](docs/engineering/technical-debt.md)
-- [Engineering maturity assessment](docs/engineering/engineering-maturity.md)
-- [Evidence index](docs/evidence/README.md)
-- [Plain-language explanation](docs/for-everyone.md)
-- Architecture Decision Records: [docs/decisions/](docs/decisions/) (ADR-001 through ADR-017)
+| Document | Purpose |
+|---|---|
+| [System architecture](docs/architecture/system-overview.md) | Architecture, components, and responsibilities |
+| [Getting started](docs/operations/getting-started.md) | Start, verify, smoke-test, and destroy procedures |
+| [Security controls](docs/security/security-controls.md) | Implemented, configured, and planned security controls |
+| [Observability](docs/observability/observability.md) | Metrics, telemetry, and observability implementation |
+| [SLOs and reliability](docs/reliability/slo.md) | Reliability objectives, formulas, and measurement boundaries |
+| [Debugging history](docs/engineering/debugging-history.md) | Incidents, root causes, fixes, and lessons learned |
+| [Technical debt](docs/engineering/technical-debt.md) | Remaining engineering work and rationale |
+| [Evidence index](docs/evidence/README.md) | Captured screenshots mapped to the claims they support |
+| [Plain-language overview](docs/for-everyone.md) | Non-specialist explanation of the platform |
+| [Architecture decisions](docs/decisions/) | ADR-001 through ADR-017 |
 
-## Evidence
+## Current scope and next engineering steps
 
-<details>
-<summary><strong>Show all captured screenshots</strong></summary>
+The project has a functioning, behaviorally tested foundation across infrastructure, CI/CD identity, GitOps, progressive delivery, admission policy, Kubernetes-level observability, and cost attribution. The next steps toward a more complete platform are:
 
-**01-cluster-nodes**
+1. Complete automated repository publishing from the Backstage golden path.
+2. Persist the Backstage catalog in a durable database and move beyond guest-only authentication.
+3. Confirm Grafana dashboard rendering and end-to-end Slack alert delivery.
+4. Review Artifact Registry vulnerability scan findings and document remediation.
+5. Introduce and validate network policies, image signing, and SBOM generation.
+6. Add a controlled resilience test plan with sufficient cluster capacity before testing node disruption.
+7. Add repeatable automated integration tests for the delivery and policy behaviors documented here.
 
+These items are presented as a forward engineering plan so reviewers can distinguish verified behavior from configured integrations and planned controls.
 
-![cluster nodes](docs/evidence/01-cluster-nodes.png)
+## Evidence and reproducibility
 
+The repository includes 22 captured evidence artifacts covering cluster state, rollout health, CI execution, Workload Identity Federation, IAM, Terraform planning, Argo CD reconciliation, canary progression and abort, Kyverno enforcement, Prometheus targets, SLO queries, cost attribution, pod recovery, and budget configuration.
 
+See the [evidence index](docs/evidence/README.md) for the artifact inventory and the specific claim each item supports. Evidence reflects the environment at the time it was captured; repeat the documented checks when validating a later deployment.
 
-**02-backstage-rollout-healthy**
+---
 
-
-![backstage rollout healthy](docs/evidence/02-backstage-rollout-healthy.png)
-
-
-
-**03-backstage-pods-service**
-
-
-![backstage pods and service](docs/evidence/03-backstage-pods-service.png)
-
-
-
-**04-gitlab-pipeline-success**
-
-
-![gitlab pipeline success](docs/evidence/04-gitlab-pipeline-success.png)
-
-
-
-**05-cloudbill-history**
-
-
-![cloud build history](docs/evidence/05-cloudbill-history.png)
-
-
-
-**06-artifacts-registry-images**
-
-
-![artifact registry images](docs/evidence/06-artifacts-registry-images.png)
-
-
-
-**07-wif-pool-provide**
-
-
-![wif pool and provider](docs/evidence/07-wif-pool-provide.png)
-
-
-
-**08-iam-least-privilege**
-
-
-![iam least privilege](docs/evidence/08-iam-least-privilege.png)
-
-
-
-**09-terraform-clean-plan**
-
-
-![terraform clean plan](docs/evidence/09-terraform-clean-plan.png)
-
-
-
-**10-argocd-app-health**
-
-
-![argocd app health](docs/evidence/10-argocd-app-health.png)
-
-
-
-**11-gitops-self-heal-sequence**
-
-
-![gitops self heal sequence](docs/evidence/11-gitops-self-heal-sequence.png)
-
-
-
-**12-canary-progression**
-
-
-![canary progression](docs/evidence/12-canary-progression.png)
-
-
-
-**13-canary-auto-rollback**
-
-
-![canary automatic rollback](docs/evidence/13-canary-auto-rollback.png)
-
-
-
-**14-kyverno-policy-list**
-
-
-![kyverno policy list](docs/evidence/14-kyverno-policy-list.png)
-
-
-
-**15-kyverno-admission-denied**
-
-
-![kyverno admission denied](docs/evidence/15-kyverno-admission-denied.png)
-
-
-
-**16-prometheus-targets-up**
-
-
-![prometheus targets up](docs/evidence/16-prometheus-targets-up.png)
-
-
-
-**17-slo-promql-live-result**
-
-
-![slo promql live result](docs/evidence/17-slo-promql-live-result.png)
-
-
-
-**18-grafana-slo-dashboard**
-
-
-![grafana slo dashboard](docs/evidence/18-grafana-slo-dashboard.png)
-
-
-
-**19-opencost-cost-breakdown**
-
-
-![opencost cost breakdown](docs/evidence/19-opencost-cost-breakdown.png)
-
-
-
-**20-pod-failure-selfheal**
-
-
-![pod failure self heal](docs/evidence/20-pod-failure-selfheal.png)
-
-
-
-**21-adr-commit-history**
-
-
-![adr commit history](docs/evidence/21-adr-commit-history.png)
-
-
-
-**22-gcp-budget-alert**
-
-
-![gcp budget alert](docs/evidence/22-gcp-budget-alert.png)
-
-
-
-</details>
+**Project focus:** Platform Engineering · DevSecOps · Kubernetes · GitOps · Progressive Delivery · Infrastructure as Code · Observability · FinOps
